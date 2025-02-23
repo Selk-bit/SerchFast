@@ -34,7 +34,7 @@ def init_db():
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Create License table
+    # 1) license
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS "license" (
             id SERIAL PRIMARY KEY,
@@ -46,7 +46,7 @@ def init_db():
         )
     ''')
 
-    # Create User table
+    # 2) users (no affiliate_id column)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS "users" (
             id SERIAL PRIMARY KEY,
@@ -59,15 +59,13 @@ def init_db():
             state TEXT,
             zip TEXT,
             license_id INTEGER,
-            affiliate_id INTEGER,
             createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (license_id) REFERENCES license(id),
-            FOREIGN KEY (affiliate_id) REFERENCES affiliate(id)
+            FOREIGN KEY (license_id) REFERENCES "license"(id)
         )
     ''')
 
-    # Create Affiliate table
+    # 3) affiliate references users
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS "affiliate" (
             id SERIAL PRIMARY KEY,
@@ -78,11 +76,11 @@ def init_db():
             earnings REAL DEFAULT 0.0,
             createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(id)
+            FOREIGN KEY (user_id) REFERENCES "users"(id)
         )
     ''')
 
-    # Create Referral table
+    # 4) referral
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS "referral" (
             id SERIAL PRIMARY KEY,
@@ -91,13 +89,13 @@ def init_db():
             payment_id INTEGER,
             isSuccessful BOOLEAN,
             createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (affiliate_id) REFERENCES affiliate(id),
-            FOREIGN KEY (referred_user_id) REFERENCES users(id),
-            FOREIGN KEY (payment_id) REFERENCES payment(id)
+            FOREIGN KEY (affiliate_id) REFERENCES "affiliate"(id),
+            FOREIGN KEY (referred_user_id) REFERENCES "users"(id),
+            FOREIGN KEY (payment_id) REFERENCES "payment"(id)
         )
     ''')
 
-    # Create Payment table
+    # 5) payment
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS "payment" (
             id SERIAL PRIMARY KEY,
@@ -106,11 +104,11 @@ def init_db():
             status TEXT,
             paymentMethod TEXT,
             paidAt TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(id)
+            FOREIGN KEY (user_id) REFERENCES "users"(id)
         )
     ''')
 
-    # Create AffiliatePayout table
+    # 6) affiliatePayout
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS "affiliatePayout" (
             id SERIAL PRIMARY KEY,
@@ -119,11 +117,11 @@ def init_db():
             payoutMethod TEXT,
             status TEXT,
             paidAt TIMESTAMP,
-            FOREIGN KEY (affiliate_id) REFERENCES affiliate(id)
+            FOREIGN KEY (affiliate_id) REFERENCES "affiliate"(id)
         )
     ''')
 
-    # Create Warning table
+    # 7) warning
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS "warning" (
             id SERIAL PRIMARY KEY,
@@ -132,11 +130,11 @@ def init_db():
             resolved BOOLEAN,
             createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(id)
+            FOREIGN KEY (user_id) REFERENCES "users"(id)
         )
     ''')
 
-    # Create Trials table (Missing in Original Code)
+    # 8) trials
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS "trials" (
             id SERIAL PRIMARY KEY,
@@ -146,9 +144,9 @@ def init_db():
         )
     ''')
 
-    # Insert dummy data into License table (Use PostgreSQL-friendly syntax)
+    # Insert dummy licenses
     cursor.execute('''
-        INSERT INTO license (licenseKey, generatedAt, expirationDate, used, user_hash)
+        INSERT INTO "license" (licenseKey, generatedAt, expirationDate, used, user_hash)
         VALUES
         ('VALID_KEY_12345', '2024-08-25', '2025-08-25', FALSE, NULL),
         ('VALID_KEY_67890', '2024-08-26', '2025-08-26', FALSE, NULL)
