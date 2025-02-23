@@ -34,9 +34,21 @@ def init_db():
     conn = get_db_connection()
     cursor = conn.cursor()
 
+    # Create License table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS "license" (
+            id SERIAL PRIMARY KEY,
+            licenseKey TEXT UNIQUE NOT NULL,
+            generatedAt TIMESTAMP NOT NULL,
+            expirationDate TIMESTAMP,
+            used BOOLEAN DEFAULT FALSE,
+            user_hash TEXT
+        )
+    ''')
+
     # Create User table
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS Users (
+        CREATE TABLE IF NOT EXISTS "users" (
             id SERIAL PRIMARY KEY,
             name TEXT,
             email TEXT UNIQUE,
@@ -50,26 +62,14 @@ def init_db():
             affiliate_id INTEGER,
             createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (license_id) REFERENCES License(id),
-            FOREIGN KEY (affiliate_id) REFERENCES Affiliate(id)
-        )
-    ''')
-
-    # Create License table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS License (
-            id SERIAL PRIMARY KEY,
-            licenseKey TEXT UNIQUE NOT NULL,
-            generatedAt TIMESTAMP NOT NULL,
-            expirationDate TIMESTAMP,
-            used BOOLEAN DEFAULT FALSE,
-            user_hash TEXT
+            FOREIGN KEY (license_id) REFERENCES license(id),
+            FOREIGN KEY (affiliate_id) REFERENCES affiliate(id)
         )
     ''')
 
     # Create Affiliate table
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS Affiliate (
+        CREATE TABLE IF NOT EXISTS "affiliate" (
             id SERIAL PRIMARY KEY,
             user_id INTEGER,
             referralCode TEXT UNIQUE,
@@ -78,67 +78,67 @@ def init_db():
             earnings REAL DEFAULT 0.0,
             createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES Users(id)
+            FOREIGN KEY (user_id) REFERENCES users(id)
         )
     ''')
 
     # Create Referral table
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS Referral (
+        CREATE TABLE IF NOT EXISTS "referral" (
             id SERIAL PRIMARY KEY,
             affiliate_id INTEGER,
             referred_user_id INTEGER,
             payment_id INTEGER,
             isSuccessful BOOLEAN,
             createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (affiliate_id) REFERENCES Affiliate(id),
-            FOREIGN KEY (referred_user_id) REFERENCES Users(id),
-            FOREIGN KEY (payment_id) REFERENCES Payment(id)
+            FOREIGN KEY (affiliate_id) REFERENCES affiliate(id),
+            FOREIGN KEY (referred_user_id) REFERENCES users(id),
+            FOREIGN KEY (payment_id) REFERENCES payment(id)
         )
     ''')
 
     # Create Payment table
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS Payment (
+        CREATE TABLE IF NOT EXISTS "payment" (
             id SERIAL PRIMARY KEY,
             user_id INTEGER,
             amount REAL,
             status TEXT,
             paymentMethod TEXT,
             paidAt TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES Users(id)
+            FOREIGN KEY (user_id) REFERENCES users(id)
         )
     ''')
 
     # Create AffiliatePayout table
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS AffiliatePayout (
+        CREATE TABLE IF NOT EXISTS "affiliatePayout" (
             id SERIAL PRIMARY KEY,
             affiliate_id INTEGER,
             amount REAL,
             payoutMethod TEXT,
             status TEXT,
             paidAt TIMESTAMP,
-            FOREIGN KEY (affiliate_id) REFERENCES Affiliate(id)
+            FOREIGN KEY (affiliate_id) REFERENCES affiliate(id)
         )
     ''')
 
     # Create Warning table
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS Warning (
+        CREATE TABLE IF NOT EXISTS "warning" (
             id SERIAL PRIMARY KEY,
             user_id INTEGER,
             reason TEXT,
             resolved BOOLEAN,
             createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES Users(id)
+            FOREIGN KEY (user_id) REFERENCES users(id)
         )
     ''')
 
     # Create Trials table (Missing in Original Code)
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS Trials (
+        CREATE TABLE IF NOT EXISTS "trials" (
             id SERIAL PRIMARY KEY,
             user_hash TEXT UNIQUE,
             count INTEGER DEFAULT 0,
@@ -148,7 +148,7 @@ def init_db():
 
     # Insert dummy data into License table (Use PostgreSQL-friendly syntax)
     cursor.execute('''
-        INSERT INTO License (licenseKey, generatedAt, expirationDate, used, user_hash)
+        INSERT INTO license (licenseKey, generatedAt, expirationDate, used, user_hash)
         VALUES
         ('VALID_KEY_12345', '2024-08-25', '2025-08-25', FALSE, NULL),
         ('VALID_KEY_67890', '2024-08-26', '2025-08-26', FALSE, NULL)
