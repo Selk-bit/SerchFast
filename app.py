@@ -16,7 +16,6 @@ cors = CORS(app)
 load_dotenv()
 #app.config['CORS_HEADERS'] = 'Content-Type'
 
-DATABASE = os.path.join('/data', 'licenses.db')
 
 client_id = os.getenv('CLIENT_ID')
 client_secret = os.getenv('CLIENT_SECRET')
@@ -272,7 +271,7 @@ def generate_license():
     try:
         # Insert the generated license into the License table
         cursor.execute('''
-            INSERT INTO license (licenseKey, generatedAt, expirationDate, used, user_hash)
+            INSERT INTO searchfast_db."license" (licenseKey, generatedAt, expirationDate, used, user_hash)
             VALUES (%s, %s, %s, FALSE, NULL)
         ''', (license_key, generated_at, expiration_date))
 
