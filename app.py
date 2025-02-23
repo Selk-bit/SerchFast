@@ -424,13 +424,8 @@ def free_trial_count():
         conn.close()
 
 
-@app.route("/initdb", methods=["POST"])
+@app.route("/initdb", methods=["GET"])
 def init_db_endpoint():
-    """
-    Endpoint to manually run init_db() on the live database.
-    This is especially useful on Render if the init_db() call
-    is never triggered by the '__main__' block in production.
-    """
     try:
         init_db()
         return jsonify({"status": "success", "message": "Database tables created/updated."}), 200
