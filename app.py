@@ -163,20 +163,19 @@ def init_db():
 
 @app.route('/check_user', methods=['POST'])
 def check_user():
-    user_id = request.json['user_id']  # user_id contains the user_hash
-    conn = sqlite3.connect(DATABASE)
+    user_id = request.json.get('user_id')  # Get user_id from JSON request
+
+    conn = get_db_connection()  # Use PostgreSQL connection
     cursor = conn.cursor()
 
-    # Check if there is any record in the License table with the received user_hash
+    # Check if the user_hash exists in the License table
     cursor.execute('SELECT id FROM License WHERE user_hash = %s', (user_id,))
     license_record = cursor.fetchone()
 
+    cursor.close()
     conn.close()
 
-    if license_record:
-        return jsonify({'licensed': True})
-    else:
-        return jsonify({'licensed': False})
+    return jsonify({'licensed': bool(license_record)})  # Return True if record exists, else False
 
 
 @app.route('/validate', methods=['POST'])
@@ -185,24 +184,31 @@ def validate_license():
     license_key = data.get('license_key')
     user_hash = data.get('user_id')
 
-    with sqlite3.connect(DATABASE) as conn:
-        cursor = conn.cursor()
+    conn = get_db_connection()  # Connect to PostgreSQL
+    cursor = conn.cursor()
 
-        # Check if the license exists and is not used
-        cursor.execute('SELECT id, used FROM License WHERE licenseKey = %s', (license_key,))
-        license_record = cursor.fetchone()
+    # Check if the license exists and is not used
+    cursor.execute('SELECT id, used FROM License WHERE licenseKey = %s', (license_key,))
+    license_record = cursor.fetchone()
 
-        if not license_record:
-            return jsonify({"valid": False, "licensed": False})  # License does not exist
+    if not license_record:
+        cursor.close()
+        conn.close()
+        return jsonify({"valid": False, "licensed": False})  # License does not exist
 
-        if license_record[1] == 1:
-            return jsonify({"valid": False, "licensed": False})  # License is used
+    if license_record[1]:  # PostgreSQL uses TRUE/FALSE for booleans
+        cursor.close()
+        conn.close()
+        return jsonify({"valid": False, "licensed": False})  # License is used
 
-        # Mark the license as used and update user_hash
-        cursor.execute('UPDATE License SET used = 1, user_hash = %s WHERE id = %s', (user_hash, license_record[0]))
-        conn.commit()
+    # Mark the license as used and update user_hash
+    cursor.execute('UPDATE License SET used = TRUE, user_hash = %s WHERE id = %s', (user_hash, license_record[0]))
+    conn.commit()
 
-        return jsonify({"valid": True, "licensed": True})
+    cursor.close()
+    conn.close()
+
+    return jsonify({"valid": True, "licensed": True})
 
 
 @app.route('/submit_user_data', methods=['POST'])
@@ -217,21 +223,24 @@ def submit_user_data():
     state = data.get('state')
     zip_code = data.get('zip')
 
-    with sqlite3.connect(DATABASE) as conn:
-        cursor = conn.cursor()
+    conn = get_db_connection()  # Connect to PostgreSQL
+    cursor = conn.cursor()
 
-        # Generate a new license if none is available
+    try:
+        # Generate a new license key
         license_key = ''.join(random.choices(string.ascii_uppercase + string.digits, k=16))
         generated_at = '2024-08-26'
-        expiration_date = '2025-08-26'  # You may generate the date dynamically
+        expiration_date = '2025-08-26'  # Consider making this dynamic
 
+        # Insert a new license
         cursor.execute('''
             INSERT INTO License (licenseKey, generatedAt, expirationDate, used, user_hash)
-            VALUES (%s, %s, %s, 0, NULL)
+            VALUES (%s, %s, %s, FALSE, NULL)
+            RETURNING id
         ''', (license_key, generated_at, expiration_date))
-        license_id = cursor.lastrowid
+        license_id = cursor.fetchone()[0]  # Retrieve the newly inserted license ID
 
-        # Insert user data into the User table with associated license
+        # Insert user data with the associated license ID
         cursor.execute('''
             INSERT INTO User (name, email, phone, address, city, state, zip, license_id, createdAt, updatedAt)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
@@ -240,6 +249,14 @@ def submit_user_data():
         conn.commit()
         return jsonify({"message": "User data received and stored successfully", "license_key": license_key}), 201
 
+    except Exception as e:
+        conn.rollback()  # Rollback in case of an error
+        return jsonify({"error": str(e)}), 500
+
+    finally:
+        cursor.close()
+        conn.close()
+
 
 
 @app.route('/generate_license', methods=['GET'])
@@ -247,20 +264,29 @@ def generate_license():
     """Endpoint to generate a random license key"""
     license_key = ''.join(random.choices(string.ascii_uppercase + string.digits, k=16))
     generated_at = '2024-08-26'
-    expiration_date = '2025-08-26'  # You may generate the date dynamically
+    expiration_date = '2025-08-26'  # Consider making this dynamic
 
-    with sqlite3.connect(DATABASE) as conn:
-        cursor = conn.cursor()
-        # Store the generated license in the License table
+    conn = get_db_connection()  # Connect to PostgreSQL
+    cursor = conn.cursor()
+
+    try:
+        # Insert the generated license into the License table
         cursor.execute('''
             INSERT INTO License (licenseKey, generatedAt, expirationDate, used, user_hash)
-            VALUES (%s, %s, %s, 0, NULL)
+            VALUES (%s, %s, %s, FALSE, NULL)
         ''', (license_key, generated_at, expiration_date))
+
         conn.commit()
+        print(f"Generated License Key: {license_key}")
+        return jsonify({"license_key": license_key}), 201
 
-    print(f"Generated License Key: {license_key}")
-    return jsonify({"license_key": license_key})
+    except Exception as e:
+        conn.rollback()  # Rollback transaction if an error occurs
+        return jsonify({"error": str(e)}), 500
 
+    finally:
+        cursor.close()
+        conn.close()
 
 
 @app.route('/get-amount', methods=['GET'])
@@ -332,47 +358,73 @@ def update_free_trial():
     data = request.json
     user_hash = data.get('user_hash')
     count = data.get('count')
+
     if not user_hash:
         return jsonify({'error': 'user_hash is required'}), 400
     if count is None:
         return jsonify({'error': 'count is required'}), 400
 
-    with sqlite3.connect(DATABASE) as conn:
-        cursor = conn.cursor()
+    conn = get_db_connection()  # Connect to PostgreSQL
+    cursor = conn.cursor()
+
+    try:
         # Check if user_hash exists
         cursor.execute('SELECT id FROM Trials WHERE user_hash = %s', (user_hash,))
         trial_record = cursor.fetchone()
+
         if trial_record:
             # Update existing record
             trial_id = trial_record[0]
-            cursor.execute('UPDATE Trials SET count = %s, updateDate = CURRENT_TIMESTAMP WHERE id = %s', (count, trial_id))
+            cursor.execute(
+                'UPDATE Trials SET count = %s, updateDate = CURRENT_TIMESTAMP WHERE id = %s',
+                (count, trial_id)
+            )
         else:
-            # Create new record with count = 1
-            cursor.execute('INSERT INTO Trials (user_hash, count, updateDate) VALUES (%s, %s, CURRENT_TIMESTAMP)',
-                           (user_hash, count))
+            # Create new record
+            cursor.execute(
+                'INSERT INTO Trials (user_hash, count, updateDate) VALUES (%s, %s, CURRENT_TIMESTAMP)',
+                (user_hash, count)
+            )
+
         conn.commit()
         return jsonify({'user_hash': user_hash, 'count': count})
+
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+
+    finally:
+        cursor.close()
+        conn.close()
 
 
 @app.route('/free_trial_count', methods=['POST'])
 def free_trial_count():
     data = request.json
     user_hash = data.get('user_hash')
+
     if not user_hash:
         return jsonify({'error': 'user_hash is required'}), 400
 
-    with sqlite3.connect(DATABASE) as conn:
-        cursor = conn.cursor()
+    conn = get_db_connection()  # Connect to PostgreSQL
+    cursor = conn.cursor()
+
+    try:
         cursor.execute('SELECT count FROM Trials WHERE user_hash = %s', (user_hash,))
         trial_record = cursor.fetchone()
-        if trial_record:
-            count, = trial_record
-            return jsonify({'user_hash': user_hash, 'count': count})
-        else:
-            # If user_hash is not found, return count as 0
-            return jsonify({'user_hash': user_hash, 'count': 0})
+
+        count = trial_record[0] if trial_record else 0  # Default to 0 if not found
+
+        return jsonify({'user_hash': user_hash, 'count': count})
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+    finally:
+        cursor.close()
+        conn.close()
 
 
 if __name__ == '__main__':
-    init_db()
+    # init_db()
     app.run(debug=True, host="0.0.0.0")
