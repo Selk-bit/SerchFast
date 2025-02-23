@@ -271,7 +271,7 @@ def generate_license():
     try:
         # Insert the generated license into the License table
         cursor.execute('''
-            INSERT INTO searchfast_db."license" (licenseKey, generatedAt, expirationDate, used, user_hash)
+            INSERT INTO searchfast_db.license (licenseKey, generatedAt, expirationDate, used, user_hash)
             VALUES (%s, %s, %s, FALSE, NULL)
         ''', (license_key, generated_at, expiration_date))
 
