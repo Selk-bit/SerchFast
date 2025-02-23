@@ -272,7 +272,7 @@ def generate_license():
     try:
         # Insert the generated license into the License table
         cursor.execute('''
-            INSERT INTO License (licenseKey, generatedAt, expirationDate, used, user_hash)
+            INSERT INTO "License" (licenseKey, generatedAt, expirationDate, used, user_hash)
             VALUES (%s, %s, %s, FALSE, NULL)
         ''', (license_key, generated_at, expiration_date))
 
@@ -426,5 +426,5 @@ def free_trial_count():
 
 
 if __name__ == '__main__':
-    init_db()
+    # init_db()
     app.run(debug=True, host="0.0.0.0")
