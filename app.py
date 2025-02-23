@@ -8,6 +8,7 @@ from paypalcheckoutsdk.orders import OrdersCreateRequest, OrdersCaptureRequest, 
 from paypalcheckoutsdk.core import PayPalHttpClient, SandboxEnvironment, LiveEnvironment
 from flask_cors import CORS, cross_origin
 from dotenv import load_dotenv
+import psycopg2
 
 
 app = Flask(__name__)
@@ -19,130 +20,145 @@ DATABASE = os.path.join('/data', 'licenses.db')
 
 client_id = os.getenv('CLIENT_ID')
 client_secret = os.getenv('CLIENT_SECRET')
+DATABASE_URL = os.getenv("DATABASE_URL")
 #environment = SandboxEnvironment(client_id=client_id, client_secret=client_secret)
 environment = LiveEnvironment(client_id=client_id, client_secret=client_secret)
 client = PayPalHttpClient(environment)
 
 
+def get_db_connection():
+    conn = psycopg2.connect(DATABASE_URL)
+    return conn
+
+
 def init_db():
-    if not os.path.exists(DATABASE):
-        conn = sqlite3.connect(DATABASE)
-        cursor = conn.cursor()
+    conn = get_db_connection()
+    cursor = conn.cursor()
 
-        # Create User table with nullable fields
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS User (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT,
-                email TEXT,
-                password TEXT,
-                phone TEXT,
-                address TEXT,
-                city TEXT,
-                state TEXT,
-                zip TEXT,
-                license_id INTEGER,
-                affiliate_id INTEGER,
-                createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-                updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (license_id) REFERENCES License(id),
-                FOREIGN KEY (affiliate_id) REFERENCES Affiliate(id)
-            )
-        ''')
+    # Create User table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS User (
+            id SERIAL PRIMARY KEY,
+            name TEXT,
+            email TEXT UNIQUE,
+            password TEXT,
+            phone TEXT,
+            address TEXT,
+            city TEXT,
+            state TEXT,
+            zip TEXT,
+            license_id INTEGER,
+            affiliate_id INTEGER,
+            createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (license_id) REFERENCES License(id),
+            FOREIGN KEY (affiliate_id) REFERENCES Affiliate(id)
+        )
+    ''')
 
-        # Create License table with "used" and "user_hash" fields
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS License (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                licenseKey TEXT UNIQUE NOT NULL,
-                generatedAt DATETIME NOT NULL,
-                expirationDate DATETIME,
-                used BOOLEAN DEFAULT 0,  -- 0: Not used, 1: Used
-                user_hash TEXT
-            )
-        ''')
+    # Create License table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS License (
+            id SERIAL PRIMARY KEY,
+            licenseKey TEXT UNIQUE NOT NULL,
+            generatedAt TIMESTAMP NOT NULL,
+            expirationDate TIMESTAMP,
+            used BOOLEAN DEFAULT FALSE,
+            user_hash TEXT
+        )
+    ''')
 
-        # Create Affiliate table with nullable fields
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS Affiliate (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER,
-                referralCode TEXT,
-                totalReferrals INTEGER DEFAULT 0,
-                successfulReferrals INTEGER DEFAULT 0,
-                earnings REAL DEFAULT 0.0,
-                createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-                updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES User(id)
-            )
-        ''')
+    # Create Affiliate table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS Affiliate (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER,
+            referralCode TEXT UNIQUE,
+            totalReferrals INTEGER DEFAULT 0,
+            successfulReferrals INTEGER DEFAULT 0,
+            earnings REAL DEFAULT 0.0,
+            createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES User(id)
+        )
+    ''')
 
-        # Create Referral table
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS Referral (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                affiliate_id INTEGER,
-                referred_user_id INTEGER,
-                payment_id INTEGER,
-                isSuccessful BOOLEAN,
-                createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (affiliate_id) REFERENCES Affiliate(id),
-                FOREIGN KEY (referred_user_id) REFERENCES User(id),
-                FOREIGN KEY (payment_id) REFERENCES Payment(id)
-            )
-        ''')
+    # Create Referral table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS Referral (
+            id SERIAL PRIMARY KEY,
+            affiliate_id INTEGER,
+            referred_user_id INTEGER,
+            payment_id INTEGER,
+            isSuccessful BOOLEAN,
+            createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (affiliate_id) REFERENCES Affiliate(id),
+            FOREIGN KEY (referred_user_id) REFERENCES User(id),
+            FOREIGN KEY (payment_id) REFERENCES Payment(id)
+        )
+    ''')
 
-        # Create Payment table
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS Payment (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER,
-                amount REAL,
-                status TEXT,
-                paymentMethod TEXT,
-                paidAt DATETIME,
-                FOREIGN KEY (user_id) REFERENCES User(id)
-            )
-        ''')
+    # Create Payment table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS Payment (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER,
+            amount REAL,
+            status TEXT,
+            paymentMethod TEXT,
+            paidAt TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES User(id)
+        )
+    ''')
 
-        # Create AffiliatePayout table
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS AffiliatePayout (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                affiliate_id INTEGER,
-                amount REAL,
-                payoutMethod TEXT,
-                status TEXT,
-                paidAt DATETIME,
-                FOREIGN KEY (affiliate_id) REFERENCES Affiliate(id)
-            )
-        ''')
+    # Create AffiliatePayout table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS AffiliatePayout (
+            id SERIAL PRIMARY KEY,
+            affiliate_id INTEGER,
+            amount REAL,
+            payoutMethod TEXT,
+            status TEXT,
+            paidAt TIMESTAMP,
+            FOREIGN KEY (affiliate_id) REFERENCES Affiliate(id)
+        )
+    ''')
 
-        # Create Warning table
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS Warning (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER,
-                reason TEXT,
-                resolved BOOLEAN,
-                createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-                updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES User(id)
-            )
-        ''')
+    # Create Warning table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS Warning (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER,
+            reason TEXT,
+            resolved BOOLEAN,
+            createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES User(id)
+        )
+    ''')
 
-        # Insert dummy data into License table
-        dummy_licenses = [
-            ("VALID_KEY_12345", '2024-08-25', '2025-08-25', 0, None),
-            ("VALID_KEY_67890", '2024-08-26', '2025-08-26', 0, None)
-        ]
-        cursor.executemany('''
-            INSERT OR IGNORE INTO License (licenseKey, generatedAt, expirationDate, used, user_hash)
-            VALUES (?, ?, ?, ?, ?)
-        ''', dummy_licenses)
+    # Create Trials table (Missing in Original Code)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS Trials (
+            id SERIAL PRIMARY KEY,
+            user_hash TEXT UNIQUE,
+            count INTEGER DEFAULT 0,
+            updateDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
 
-        conn.commit()
-        conn.close()
+    # Insert dummy data into License table (Use PostgreSQL-friendly syntax)
+    cursor.execute('''
+        INSERT INTO License (licenseKey, generatedAt, expirationDate, used, user_hash)
+        VALUES
+        ('VALID_KEY_12345', '2024-08-25', '2025-08-25', FALSE, NULL),
+        ('VALID_KEY_67890', '2024-08-26', '2025-08-26', FALSE, NULL)
+        ON CONFLICT (licenseKey) DO NOTHING;
+    ''')
+
+    conn.commit()
+    cursor.close()
+    conn.close()
 
 
 @app.route('/check_user', methods=['POST'])
@@ -152,7 +168,7 @@ def check_user():
     cursor = conn.cursor()
 
     # Check if there is any record in the License table with the received user_hash
-    cursor.execute('SELECT id FROM License WHERE user_hash = ?', (user_id,))
+    cursor.execute('SELECT id FROM License WHERE user_hash = %s', (user_id,))
     license_record = cursor.fetchone()
 
     conn.close()
@@ -173,7 +189,7 @@ def validate_license():
         cursor = conn.cursor()
 
         # Check if the license exists and is not used
-        cursor.execute('SELECT id, used FROM License WHERE licenseKey = ?', (license_key,))
+        cursor.execute('SELECT id, used FROM License WHERE licenseKey = %s', (license_key,))
         license_record = cursor.fetchone()
 
         if not license_record:
@@ -183,7 +199,7 @@ def validate_license():
             return jsonify({"valid": False, "licensed": False})  # License is used
 
         # Mark the license as used and update user_hash
-        cursor.execute('UPDATE License SET used = 1, user_hash = ? WHERE id = ?', (user_hash, license_record[0]))
+        cursor.execute('UPDATE License SET used = 1, user_hash = %s WHERE id = %s', (user_hash, license_record[0]))
         conn.commit()
 
         return jsonify({"valid": True, "licensed": True})
@@ -211,14 +227,14 @@ def submit_user_data():
 
         cursor.execute('''
             INSERT INTO License (licenseKey, generatedAt, expirationDate, used, user_hash)
-            VALUES (?, ?, ?, 0, NULL)
+            VALUES (%s, %s, %s, 0, NULL)
         ''', (license_key, generated_at, expiration_date))
         license_id = cursor.lastrowid
 
         # Insert user data into the User table with associated license
         cursor.execute('''
             INSERT INTO User (name, email, phone, address, city, state, zip, license_id, createdAt, updatedAt)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime("now"), datetime("now"))
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         ''', (name, email, phone, address, city, state, zip_code, license_id))
 
         conn.commit()
@@ -238,7 +254,7 @@ def generate_license():
         # Store the generated license in the License table
         cursor.execute('''
             INSERT INTO License (licenseKey, generatedAt, expirationDate, used, user_hash)
-            VALUES (?, ?, ?, 0, NULL)
+            VALUES (%s, %s, %s, 0, NULL)
         ''', (license_key, generated_at, expiration_date))
         conn.commit()
 
@@ -324,15 +340,15 @@ def update_free_trial():
     with sqlite3.connect(DATABASE) as conn:
         cursor = conn.cursor()
         # Check if user_hash exists
-        cursor.execute('SELECT id FROM Trials WHERE user_hash = ?', (user_hash,))
+        cursor.execute('SELECT id FROM Trials WHERE user_hash = %s', (user_hash,))
         trial_record = cursor.fetchone()
         if trial_record:
             # Update existing record
             trial_id = trial_record[0]
-            cursor.execute('UPDATE Trials SET count = ?, updateDate = datetime("now") WHERE id = ?', (count, trial_id))
+            cursor.execute('UPDATE Trials SET count = %s, updateDate = CURRENT_TIMESTAMP WHERE id = %s', (count, trial_id))
         else:
             # Create new record with count = 1
-            cursor.execute('INSERT INTO Trials (user_hash, count, updateDate) VALUES (?, ?, datetime("now"))',
+            cursor.execute('INSERT INTO Trials (user_hash, count, updateDate) VALUES (%s, %s, CURRENT_TIMESTAMP)',
                            (user_hash, count))
         conn.commit()
         return jsonify({'user_hash': user_hash, 'count': count})
@@ -347,7 +363,7 @@ def free_trial_count():
 
     with sqlite3.connect(DATABASE) as conn:
         cursor = conn.cursor()
-        cursor.execute('SELECT count FROM Trials WHERE user_hash = ?', (user_hash,))
+        cursor.execute('SELECT count FROM Trials WHERE user_hash = %s', (user_hash,))
         trial_record = cursor.fetchone()
         if trial_record:
             count, = trial_record
