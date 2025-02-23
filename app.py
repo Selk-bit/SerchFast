@@ -80,6 +80,19 @@ def init_db():
         )
     ''')
 
+    # 5) payment
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS "payment" (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER,
+            amount REAL,
+            status TEXT,
+            paymentMethod TEXT,
+            paidAt TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES "users"(id)
+        )
+    ''')
+
     # 4) referral
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS "referral" (
@@ -92,19 +105,6 @@ def init_db():
             FOREIGN KEY (affiliate_id) REFERENCES "affiliate"(id),
             FOREIGN KEY (referred_user_id) REFERENCES "users"(id),
             FOREIGN KEY (payment_id) REFERENCES "payment"(id)
-        )
-    ''')
-
-    # 5) payment
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS "payment" (
-            id SERIAL PRIMARY KEY,
-            user_id INTEGER,
-            amount REAL,
-            status TEXT,
-            paymentMethod TEXT,
-            paidAt TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES "users"(id)
         )
     ''')
 
