@@ -271,7 +271,7 @@ def generate_license():
     try:
         # Insert the generated license into the License table
         cursor.execute('''
-            INSERT INTO public."License" (licenseKey, generatedAt, expirationDate, used, user_hash)
+            INSERT INTO License (licenseKey, generatedAt, expirationDate, used, user_hash)
             VALUES (%s, %s, %s, FALSE, NULL)
         ''', (license_key, generated_at, expiration_date))
 
@@ -424,6 +424,20 @@ def free_trial_count():
         conn.close()
 
 
+@app.route("/initdb", methods=["POST"])
+def init_db_endpoint():
+    """
+    Endpoint to manually run init_db() on the live database.
+    This is especially useful on Render if the init_db() call
+    is never triggered by the '__main__' block in production.
+    """
+    try:
+        init_db()
+        return jsonify({"status": "success", "message": "Database tables created/updated."}), 200
+    except Exception as e:
+        # Log or return the full error
+        return jsonify({"status": "error", "error": str(e)}), 500
+
+
 if __name__ == '__main__':
-    # init_db()
     app.run(debug=True, host="0.0.0.0")
