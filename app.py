@@ -15,7 +15,7 @@ cors = CORS(app)
 load_dotenv()
 #app.config['CORS_HEADERS'] = 'Content-Type'
 
-DATABASE = 'licenses.db'
+DATABASE = os.path.join(os.getcwd(), 'licenses.db')
 
 client_id = os.getenv('CLIENT_ID')
 client_secret = os.getenv('CLIENT_SECRET')
