@@ -36,7 +36,7 @@ def init_db():
 
     # Create User table
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS User (
+        CREATE TABLE IF NOT EXISTS Users (
             id SERIAL PRIMARY KEY,
             name TEXT,
             email TEXT UNIQUE,
@@ -78,7 +78,7 @@ def init_db():
             earnings REAL DEFAULT 0.0,
             createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES User(id)
+            FOREIGN KEY (user_id) REFERENCES Users(id)
         )
     ''')
 
@@ -92,7 +92,7 @@ def init_db():
             isSuccessful BOOLEAN,
             createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (affiliate_id) REFERENCES Affiliate(id),
-            FOREIGN KEY (referred_user_id) REFERENCES User(id),
+            FOREIGN KEY (referred_user_id) REFERENCES Users(id),
             FOREIGN KEY (payment_id) REFERENCES Payment(id)
         )
     ''')
@@ -106,7 +106,7 @@ def init_db():
             status TEXT,
             paymentMethod TEXT,
             paidAt TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES User(id)
+            FOREIGN KEY (user_id) REFERENCES Users(id)
         )
     ''')
 
@@ -132,7 +132,7 @@ def init_db():
             resolved BOOLEAN,
             createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES User(id)
+            FOREIGN KEY (user_id) REFERENCES Users(id)
         )
     ''')
 
@@ -241,7 +241,7 @@ def submit_user_data():
 
         # Insert user data with the associated license ID
         cursor.execute('''
-            INSERT INTO User (name, email, phone, address, city, state, zip, license_id, createdAt, updatedAt)
+            INSERT INTO Users (name, email, phone, address, city, state, zip, license_id, createdAt, updatedAt)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         ''', (name, email, phone, address, city, state, zip_code, license_id))
 
