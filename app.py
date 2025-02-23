@@ -15,7 +15,7 @@ cors = CORS(app)
 load_dotenv()
 #app.config['CORS_HEADERS'] = 'Content-Type'
 
-DATABASE = os.path.join(os.getcwd(), 'licenses.db')
+DATABASE = os.path.join('/data', 'licenses.db')
 
 client_id = os.getenv('CLIENT_ID')
 client_secret = os.getenv('CLIENT_SECRET')
@@ -358,5 +358,5 @@ def free_trial_count():
 
 
 if __name__ == '__main__':
-    #init_db()
+    init_db()
     app.run(debug=True, host="0.0.0.0")
