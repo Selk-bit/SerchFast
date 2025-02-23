@@ -15,13 +15,7 @@ cors = CORS(app)
 load_dotenv()
 #app.config['CORS_HEADERS'] = 'Content-Type'
 
-DATABASE = os.path.join(os.getcwd(), 'licenses.db')
-
-#paypalrestsdk.configure({
-#    "mode": "sandbox",  # or "live"
-#    "client_id": "AY1TX4NMm67FzQgWPrZi9XyTOSQk01aHdE-ynchxQI68P6HUdWYHuog35W1PwhudCI1CvS_7pBYW2xC0",
-#    "client_secret": "EKO0Aym-inhhJ7IOc211VzqIzGLvfjMkgl8drmYa8n_lQVVU3oZp06Kr7-foPd1AB2LUC24XMZ0T9SK0"
-#})
+DATABASE = 'licenses.db'
 
 client_id = os.getenv('CLIENT_ID')
 client_secret = os.getenv('CLIENT_SECRET')
