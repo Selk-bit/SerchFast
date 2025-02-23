@@ -426,5 +426,5 @@ def free_trial_count():
 
 
 if __name__ == '__main__':
-    # init_db()
+    init_db()
     app.run(debug=True, host="0.0.0.0")
