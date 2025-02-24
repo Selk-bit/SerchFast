@@ -303,7 +303,7 @@ def create_order():
         "purchase_units": [{
             "amount": {
                 "currency_code": "USD",
-                "value": "0.99"
+                "value": "29.99"
             }
         }]
     })
