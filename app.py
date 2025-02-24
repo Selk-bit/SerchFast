@@ -303,7 +303,7 @@ def create_order():
         "purchase_units": [{
             "amount": {
                 "currency_code": "USD",
-                "value": "29.99"
+                "value": "0.99"
             }
         }]
     })
@@ -430,6 +430,62 @@ def init_db_endpoint():
     except Exception as e:
         # Log or return the full error
         return jsonify({"status": "error", "error": str(e)}), 500
+
+
+@app.route('/users', methods=['GET'])
+def get_all_users():
+    """
+    Fetch and return all users in JSON format.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute('SELECT * FROM "users"')
+        rows = cursor.fetchall()
+
+        # Get column names for a more dynamic approach
+        colnames = [desc[0] for desc in cursor.description]
+
+        # Convert each row into a dictionary {column_name: value}
+        users = [dict(zip(colnames, row)) for row in rows]
+
+        return jsonify(users), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@app.route('/licenses', methods=['GET'])
+def get_all_licenses():
+    """
+    Fetch and return all licenses in JSON format.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute('SELECT * FROM "license"')
+        rows = cursor.fetchall()
+
+        # Get column names
+        colnames = [desc[0] for desc in cursor.description]
+
+        # Convert each row into a dictionary
+        licenses = [dict(zip(colnames, row)) for row in rows]
+
+        return jsonify(licenses), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    finally:
+        cursor.close()
+        conn.close()
 
 
 if __name__ == '__main__':
