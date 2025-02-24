@@ -20,6 +20,7 @@ load_dotenv()
 client_id = os.getenv('CLIENT_ID')
 client_secret = os.getenv('CLIENT_SECRET')
 DATABASE_URL = os.getenv("DATABASE_URL")
+admin_secret = os.getenv("ADMIN_SECRET")
 #environment = SandboxEnvironment(client_id=client_id, client_secret=client_secret)
 environment = LiveEnvironment(client_id=client_id, client_secret=client_secret)
 client = PayPalHttpClient(environment)
@@ -259,6 +260,10 @@ def submit_user_data():
 @app.route('/generate_license', methods=['GET'])
 def generate_license():
     """Endpoint to generate a random license key"""
+    secret_key = request.headers.get("x-admin-secret")
+    if not secret_key or secret_key != admin_secret:
+        return jsonify({"error": "Unauthorized"}), 401
+
     license_key = ''.join(random.choices(string.ascii_uppercase + string.digits, k=16))
     generated_at = '2024-08-26'
     expiration_date = '2025-08-26'  # Consider making this dynamic
@@ -437,6 +442,10 @@ def get_all_users():
     """
     Fetch and return all users in JSON format.
     """
+    secret_key = request.headers.get("x-admin-secret")
+    if not secret_key or secret_key != admin_secret:
+        return jsonify({"error": "Unauthorized"}), 401
+
     conn = get_db_connection()
     cursor = conn.cursor()
 
@@ -465,6 +474,10 @@ def get_all_licenses():
     """
     Fetch and return all licenses in JSON format.
     """
+    secret_key = request.headers.get("x-admin-secret")
+    if not secret_key or secret_key != admin_secret:
+        return jsonify({"error": "Unauthorized"}), 401
+
     conn = get_db_connection()
     cursor = conn.cursor()
 
